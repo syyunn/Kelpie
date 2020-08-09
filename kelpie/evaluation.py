@@ -1,7 +1,7 @@
 import html
 
 from kelpie.model import Model
-from kelpie.models.complex.model import KelpieComplEx
+from kelpie.models.complex.model import KelpieComplEx, MultiKelpieComplEx
 import numpy as np
 
 class Evaluator:
@@ -106,3 +106,31 @@ class KelpieEvaluator(Evaluator):
             self._write_output(samples, ranks, predictions)
 
         return self.mrr(all_ranks), self.hits_at(all_ranks, 1)
+
+
+
+class MultiKelpieEvaluator(Evaluator):
+
+    def __init__(self, model: MultiKelpieComplEx):
+        super().__init__(model)
+        self.model = model
+
+    # override
+    def eval(self,
+             samples: np.array,
+             write_output:bool = False,
+             original_mode:bool = False):
+
+        # run prediction on the samples
+        scores, ranks, predictions = self.model.predict_samples(samples, original_mode)
+
+        all_ranks = []
+        for i in range(samples.shape[0]):
+            all_ranks.append(ranks[i][0])
+            all_ranks.append(ranks[i][1])
+
+        if write_output:
+            self._write_output(samples, ranks, predictions)
+
+        return self.mrr(all_ranks), self.hits_at(all_ranks, 1)
+

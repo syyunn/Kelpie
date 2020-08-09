@@ -1,14 +1,16 @@
 import numpy
 
-def perturbate_samples(samples):
+def perturbate_samples(kelpie_entity_id, samples):
 
     output = []
     skipped = []
 
     for i in range(len(samples)):
-        sample_to_skip = samples[i]
-        skipped.append([sample_to_skip])
-        output.append(numpy.vstack((samples[:i], samples[i+1:])))
+        cur_sample = samples[i]
+
+        if kelpie_entity_id == cur_sample[0] or kelpie_entity_id == cur_sample[2]:
+            skipped.append([cur_sample])
+            output.append(numpy.vstack((samples[:i], samples[i+1:])))
 
     return output, skipped
 

@@ -4,7 +4,7 @@ import numpy as np
 from torch import nn
 from torch import optim
 
-from kelpie.models.complex.model import ComplEx, KelpieComplEx
+from kelpie.models.complex.model import ComplEx, KelpieComplEx, MultiKelpieComplEx
 from kelpie.evaluation import Evaluator
 from kelpie.models.complex.regularizer import N3, N2
 
@@ -135,6 +135,53 @@ class KelpieComplExOptimizer(ComplExOptimizer):
                  verbose: bool = True):
 
         super(KelpieComplExOptimizer, self).__init__(model=model,
+                                                     optimizer_name=optimizer_name,
+                                                     batch_size=batch_size,
+                                                     learning_rate=learning_rate,
+                                                     decay1=decay1,
+                                                     decay2=decay2,
+                                                     regularizer_name=regularizer_name,
+                                                     regularizer_weight=regularizer_weight,
+                                                     verbose=verbose)
+
+    def epoch(self,
+              batch_size: int,
+              training_samples: np.array):
+        training_samples = torch.from_numpy(training_samples).cuda()
+        # at the beginning of the epoch, shuffle all samples randomly
+        actual_samples = training_samples[torch.randperm(training_samples.shape[0]), :]
+        loss = nn.CrossEntropyLoss(reduction='mean')
+
+        with tqdm.tqdm(total=training_samples.shape[0], unit='ex', disable=not self.verbose) as bar:
+            bar.set_description(f'train loss')
+
+            batch_start = 0
+            while batch_start < training_samples.shape[0]:
+                batch = actual_samples[batch_start: batch_start + batch_size].cuda()
+                l = self.step_on_batch(loss, batch)
+
+                # THIS IS THE ONE DIFFERENCE FROM THE ORIGINAL OPTIMIZER.
+                # THIS IS EXTREMELY IMPORTANT BECAUSE THIS WILL PROPAGATE THE UPDATES IN THE KELPIE ENTITY EMBEDDING
+                # TO THE MATRIX CONTAINING ALL THE EMBEDDINGS
+                self.model.update_embeddings()
+
+                batch_start += self.batch_size
+                bar.update(batch.shape[0])
+                bar.set_postfix(loss=f'{l.item():.0f}')
+
+class MultiKelpieComplExOptimizer(ComplExOptimizer):
+    def __init__(self,
+                 model: MultiKelpieComplEx,
+                 optimizer_name: str = "Adagrad",
+                 batch_size :int = 256,
+                 learning_rate: float = 1e-2,
+                 decay1 :float = 0.9,
+                 decay2 :float = 0.99,
+                 regularizer_name: str = "N3",
+                 regularizer_weight: float = 5e-2,
+                 verbose: bool = True):
+
+        super(MultiKelpieComplExOptimizer, self).__init__(model=model,
                                                      optimizer_name=optimizer_name,
                                                      batch_size=batch_size,
                                                      learning_rate=learning_rate,
